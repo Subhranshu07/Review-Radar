@@ -324,14 +324,16 @@ export async function scrapeReviews(
 }
 
 export function estimateMonthlyRevenue(bsr: number, price: number): number {
+  // Calibrated for Indian market — US multipliers overestimate by ~5x.
+  // Max capped at 30 units/day for BSR ≤ 100, scaling down from there.
   let dailyUnits = 0;
-  if (bsr <= 100) dailyUnits = 150;
-  else if (bsr <= 500) dailyUnits = 80;
-  else if (bsr <= 1000) dailyUnits = 50;
-  else if (bsr <= 5000) dailyUnits = 25;
-  else if (bsr <= 10000) dailyUnits = 12;
-  else if (bsr <= 50000) dailyUnits = 5;
-  else if (bsr <= 100000) dailyUnits = 2;
-  else dailyUnits = 0.5;
-  return dailyUnits * 30 * price;
+  if (bsr <= 100) dailyUnits = 30;
+  else if (bsr <= 500) dailyUnits = 16;
+  else if (bsr <= 1000) dailyUnits = 10;
+  else if (bsr <= 5000) dailyUnits = 5;
+  else if (bsr <= 10000) dailyUnits = 2;
+  else if (bsr <= 50000) dailyUnits = 1;
+  else if (bsr <= 100000) dailyUnits = 0.4;
+  else dailyUnits = 0.1;
+  return Math.round(dailyUnits * 30 * price);
 }
