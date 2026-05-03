@@ -7,13 +7,9 @@ import { Nav } from "@/components/nav";
 
 const STEPS = [
   { label: "Finding your listing", threshold: 10 },
-  { label: "Discovering 9 competitors", threshold: 20 },
+  { label: "Discovering competitors", threshold: 20 },
   { label: "Collecting reviews", threshold: 40 },
-  { label: "Customer Analyst running (Role 1 of 5)", threshold: 54 },
-  { label: "Complaint Detector running (Role 2 of 5)", threshold: 66 },
-  { label: "Competitor Strategist running (Role 3 of 5)", threshold: 78 },
-  { label: "Product Manager running (Role 4 of 5)", threshold: 88 },
-  { label: "Copywriter running (Role 5 of 5)", threshold: 95 },
+  { label: "Running AI analysis", threshold: 85 },
   { label: "Building your dashboard", threshold: 100 },
 ];
 

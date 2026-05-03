@@ -16,13 +16,7 @@ import {
   getAmazonDomain,
   getCurrencySymbol,
 } from "./scraper";
-import {
-  runCustomerAnalyst,
-  runComplaintDetector,
-  runCompetitorStrategist,
-  runProductManager,
-  runCopywriter,
-} from "./groq";
+import { runFullAnalysis } from "./groq";
 
 async function updateProgress(
   reportId: number,
@@ -152,56 +146,37 @@ export async function runPipeline(reportId: number, listingUrl: string) {
       })
       .where(eq(reportsTable.id, reportId));
 
-    await updateProgress(reportId, "Customer Analyst running... (Role 1 of 5)", 42);
-    const customerAnalysis = await runCustomerAnalyst(mainListing.title, allReviews);
-
-    await updateProgress(reportId, "Complaint Detector running... (Role 2 of 5)", 54);
-    const complaintAnalysis = await runComplaintDetector(mainListing.title, allReviews);
-
-    await updateProgress(reportId, "Competitor Strategist running... (Role 3 of 5)", 66);
-    const competitorAnalysis = await runCompetitorStrategist(
+    await updateProgress(reportId, "Running AI analysis...", 50);
+    const analysis = await runFullAnalysis(
       mainListing.title,
       mainListing.bulletPoints,
-      complaintAnalysis,
+      allReviews,
       competitorListings
-    );
-
-    await updateProgress(reportId, "Product Manager running... (Role 4 of 5)", 78);
-    const pmAnalysis = await runProductManager(mainListing.title, complaintAnalysis, competitorAnalysis);
-
-    await updateProgress(reportId, "Copywriter running... (Role 5 of 5)", 88);
-    const copyAnalysis = await runCopywriter(
-      mainListing.title,
-      mainListing.title,
-      mainListing.bulletPoints,
-      customerAnalysis,
-      complaintAnalysis,
-      competitorAnalysis
     );
 
     await updateProgress(reportId, "Building your dashboard...", 95);
 
     await db.insert(analysisResultsTable).values({
       reportId,
-      purchaseDrivers: JSON.stringify(customerAnalysis.topPurchaseDrivers),
-      keyPhrases: JSON.stringify(customerAnalysis.keyPhrasesCustomersUse),
-      buyerPersona: customerAnalysis.primaryBuyerPersona,
-      emotionalTriggers: JSON.stringify(customerAnalysis.emotionalTriggers),
-      topComplaints: JSON.stringify(complaintAnalysis.topComplaints),
-      returnReasons: JSON.stringify(complaintAnalysis.returnReasons),
-      unmetExpectations: JSON.stringify(complaintAnalysis.unmetExpectations),
-      competitorAdvantages: JSON.stringify(competitorAnalysis.whatCompetitorsEmphasizeBetter),
-      productWeaknesses: JSON.stringify(competitorAnalysis.mainProductWeaknesses),
-      productStrengths: JSON.stringify(competitorAnalysis.mainProductStrengths),
-      missedPositioning: JSON.stringify(competitorAnalysis.missedPositioningOpportunities),
-      fixRightNow: JSON.stringify(pmAnalysis.fixRightNow),
-      featureGaps: JSON.stringify(pmAnalysis.featureGaps),
-      quickWins: JSON.stringify(pmAnalysis.quickWins),
-      improvedTitle: copyAnalysis.improvedTitle,
-      improvedBullets: JSON.stringify(copyAnalysis.improvedBullets),
-      marketingAngles: JSON.stringify(copyAnalysis.marketingAngles),
-      adHeadlines: JSON.stringify(copyAnalysis.suggestedAdHeadlines),
-      toneAndVoiceNotes: copyAnalysis.toneAndVoiceNotes,
+      purchaseDrivers: JSON.stringify(analysis.purchaseDrivers),
+      keyPhrases: JSON.stringify(analysis.keyPhrases),
+      buyerPersona: analysis.buyerPersona,
+      emotionalTriggers: JSON.stringify(analysis.emotionalTriggers),
+      topComplaints: JSON.stringify(analysis.topComplaints),
+      returnReasons: JSON.stringify(analysis.returnReasons),
+      unmetExpectations: JSON.stringify(analysis.unmetExpectations),
+      competitorAdvantages: JSON.stringify(analysis.competitorAdvantages),
+      productWeaknesses: JSON.stringify(analysis.productWeaknesses),
+      productStrengths: JSON.stringify(analysis.productStrengths),
+      missedPositioning: JSON.stringify(analysis.missedPositioning),
+      fixRightNow: JSON.stringify(analysis.fixRightNow),
+      featureGaps: JSON.stringify(analysis.featureGaps),
+      quickWins: JSON.stringify(analysis.quickWins),
+      improvedTitle: analysis.improvedTitle,
+      improvedBullets: JSON.stringify(analysis.improvedBullets),
+      marketingAngles: JSON.stringify(analysis.marketingAngles),
+      adHeadlines: JSON.stringify(analysis.adHeadlines),
+      toneAndVoiceNotes: analysis.toneAndVoiceNotes,
     });
 
     await db
