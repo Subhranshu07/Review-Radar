@@ -20,11 +20,16 @@ function randomDelay() {
   return sleep(1000 + Math.random() * 1000);
 }
 
-/** Returns "in" for amazon.in URLs, "com" for everything else */
+/** Returns "in" for amazon.in / amzn.in URLs, "com" for everything else */
 export function detectMarketplace(url: string): "in" | "com" {
   try {
     const hostname = new URL(url).hostname.toLowerCase();
-    if (hostname === "amazon.in" || hostname === "www.amazon.in") return "in";
+    if (
+      hostname === "amazon.in" ||
+      hostname === "www.amazon.in" ||
+      hostname === "amzn.in"
+    )
+      return "in";
   } catch {}
   return "com";
 }
@@ -67,6 +72,56 @@ async function fetchPage(url: string, attempt = 1): Promise<string> {
 export function extractAsinFromUrl(url: string): string | null {
   const match = url.match(/\/dp\/([A-Z0-9]{10})/);
   return match ? match[1] : null;
+}
+
+/**
+ * Accepts any Amazon URL format and returns a clean canonical URL:
+ *   https://www.amazon.in/dp/{ASIN}  or  https://www.amazon.com/dp/{ASIN}
+ *
+ * Handles:
+ *   - https://www.amazon.in/dp/B0DWMQDYSZ
+ *   - https://amazon.com/dp/B0DWMQDYSZ/ref=...
+ *   - https://amzn.in/d/02RJrT7Z   (follows HTTP redirect)
+ *   - https://amzn.com/d/02RJrT7Z  (follows HTTP redirect)
+ */
+export async function resolveAmazonUrl(inputUrl: string): Promise<string> {
+  let url = inputUrl.trim();
+  if (!url.startsWith("http")) url = "https://" + url;
+
+  const parsed = new URL(url);
+  const host = parsed.hostname.toLowerCase();
+  const isShortUrl = host === "amzn.in" || host === "amzn.com";
+
+  if (isShortUrl) {
+    // Infer marketplace from short-URL domain before following redirect
+    const marketplace: "in" | "com" = host === "amzn.in" ? "in" : "com";
+    const domain = getAmazonDomain(marketplace);
+
+    try {
+      const res = await axios.get(url, {
+        headers: { "User-Agent": HEADERS["User-Agent"] },
+        maxRedirects: 10,
+        timeout: 12000,
+      });
+      // axios (via follow-redirects) exposes the final URL here
+      const finalUrl: string =
+        (res.request as { res?: { responseUrl?: string } })?.res?.responseUrl ||
+        url;
+      const asin = extractAsinFromUrl(finalUrl);
+      if (!asin) throw new Error(`No ASIN found in resolved URL: ${finalUrl}`);
+      return `https://www.${domain}/dp/${asin}`;
+    } catch (err) {
+      logger.warn({ url, err }, "Failed to resolve short Amazon URL");
+      throw new Error("Could not resolve the short URL. Please use the full Amazon product URL.");
+    }
+  }
+
+  // Full URL — just extract ASIN and rebuild a clean canonical URL
+  const asin = extractAsinFromUrl(url);
+  if (!asin) throw new Error(`No ASIN found in URL: ${url}`);
+  const marketplace = detectMarketplace(url);
+  const domain = getAmazonDomain(marketplace);
+  return `https://www.${domain}/dp/${asin}`;
 }
 
 export interface ListingData {

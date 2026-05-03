@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, ilike, sql } from "drizzle-orm";
 import { runPipeline } from "../services/pipeline";
-import { extractAsinFromUrl } from "../services/scraper";
+import { resolveAmazonUrl } from "../services/scraper";
 
 const router = Router();
 
@@ -25,6 +25,11 @@ function isValidAmazonUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     const host = parsed.hostname.toLowerCase();
+    // Short URLs: amzn.in/d/xxx or amzn.com/d/xxx
+    if (host === "amzn.in" || host === "amzn.com") {
+      return /^\/d\/[A-Za-z0-9]+/.test(parsed.pathname);
+    }
+    // Full Amazon URLs with /dp/ASIN anywhere in path
     const isAmazon =
       host === "amazon.com" ||
       host === "www.amazon.com" ||
@@ -50,7 +55,16 @@ router.post("/analyze", async (req, res) => {
   const { listingUrl } = req.body as { listingUrl?: string };
 
   if (!listingUrl || !isValidAmazonUrl(listingUrl)) {
-    res.status(400).json({ error: "Please provide a valid Amazon product URL (e.g. https://www.amazon.com/dp/ASIN)" });
+    res.status(400).json({ error: "Please provide a valid Amazon URL — full (amazon.com/dp/ASIN) or short (amzn.in/d/...)" });
+    return;
+  }
+
+  // Resolve short URLs (amzn.in/d/xxx) to canonical amazon.in/dp/ASIN form
+  let resolvedUrl: string;
+  try {
+    resolvedUrl = await resolveAmazonUrl(listingUrl);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message || "Could not resolve the provided URL. Please use a direct Amazon product URL." });
     return;
   }
 
@@ -89,7 +103,7 @@ router.post("/analyze", async (req, res) => {
     .insert(reportsTable)
     .values({
       shareToken,
-      mainListingUrl: listingUrl,
+      mainListingUrl: resolvedUrl,
       status: "PENDING",
       progressMessage: "Starting analysis...",
       percentComplete: 0,
@@ -97,7 +111,7 @@ router.post("/analyze", async (req, res) => {
     .returning();
 
   // Fire and forget
-  runPipeline(report.id, listingUrl).catch((err) => {
+  runPipeline(report.id, resolvedUrl).catch((err) => {
     console.error("Pipeline error:", err);
   });
 

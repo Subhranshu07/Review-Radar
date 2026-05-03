@@ -6,6 +6,22 @@ import { useAnalyzeProduct, useGetStats, useGetRecentReports } from "@workspace/
 import { Nav } from "@/components/nav";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 
+function isValidAmazonUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url.startsWith("http") ? url : "https://" + url);
+    const host = parsed.hostname.toLowerCase();
+    if (host === "amzn.in" || host === "amzn.com") {
+      return /^\/d\/[A-Za-z0-9]+/.test(parsed.pathname);
+    }
+    const isAmazon =
+      host === "amazon.com" || host === "www.amazon.com" ||
+      host === "amazon.in"  || host === "www.amazon.in";
+    return isAmazon && /\/dp\/[A-Z0-9]{10}/.test(url);
+  } catch {
+    return false;
+  }
+}
+
 export default function Home() {
   const [, setLocation] = useLocation();
   const [url, setUrl] = useState("");
@@ -22,10 +38,9 @@ export default function Home() {
       setError("Please enter an Amazon product URL");
       return;
     }
-    const isAmazonCom = url.includes("amazon.com") && url.includes("/dp/");
-    const isAmazonIn = url.includes("amazon.in") && url.includes("/dp/");
-    if (!isAmazonCom && !isAmazonIn) {
-      setError("Please enter a valid Amazon product URL (amazon.com or amazon.in, e.g. https://www.amazon.in/dp/B08...)");
+    const isValid = isValidAmazonUrl(url);
+    if (!isValid) {
+      setError("Please enter a valid Amazon URL — full (amazon.com/dp/...) or short (amzn.in/d/...)");
       return;
     }
     analyze.mutate(
@@ -82,7 +97,7 @@ export default function Home() {
                     type="url"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://www.amazon.com/dp/B08... or amazon.in/dp/..."
+                    placeholder="amazon.com/dp/B08... or amzn.in/d/... or amazon.in/dp/..."
                     className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
                     data-testid="input-amazon-url"
                     disabled={analyze.isPending}
