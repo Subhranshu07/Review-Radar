@@ -225,9 +225,9 @@ export async function scrapeCompetitorAsins(
     }
   });
 
-  // Return more candidates than needed so the pipeline can filter same-brand products
-  // and still end up with up to 9 true competitors
-  return asins.slice(0, 18);
+  // Return more candidates than needed so the pipeline can filter same-brand
+  // and out-of-price-range products and still end up with up to 9 true competitors
+  return asins.slice(0, 30);
 }
 
 export async function scrapeReviews(

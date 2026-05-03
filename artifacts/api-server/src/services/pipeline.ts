@@ -124,6 +124,19 @@ export async function runPipeline(reportId: number, listingUrl: string) {
         continue;
       }
 
+      // Skip accessories / cheap add-ons that are more than 80% cheaper than the main product
+      // e.g. a ₹500 remote should not compete with a ₹35,000 AC unit
+      if (mainListing.price > 0 && listing.price > 0) {
+        const priceRatio = listing.price / mainListing.price;
+        if (priceRatio < 0.2) {
+          logger.info(
+            { asin, listingPrice: listing.price, mainPrice: mainListing.price },
+            "Skipping out-of-price-range product (>80% cheaper)"
+          );
+          continue;
+        }
+      }
+
       const compRevenue = estimateMonthlyRevenue(listing.bsr, listing.price);
       totalMarketRevenue += compRevenue;
       competitorListings.push({ title: listing.title, bulletPoints: listing.bulletPoints, revenue: compRevenue, asin: listing.asin });
