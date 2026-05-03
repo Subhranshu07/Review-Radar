@@ -77,7 +77,7 @@ export async function runPipeline(reportId: number, listingUrl: string) {
 
     let competitorAsins: string[] = [];
     try {
-      competitorAsins = await scrapeCompetitorAsins(mainListing.title, mainListing.asin, marketplace);
+      competitorAsins = await scrapeCompetitorAsins(mainListing.title, mainListing.asin, marketplace, mainListing.brand);
     } catch (err) {
       logger.warn({ err }, "Failed to find competitor ASINs");
     }

@@ -195,18 +195,72 @@ export async function scrapeListing(url: string): Promise<ListingData> {
   };
 }
 
+/**
+ * Extracts a tight, category-focused search query from a product title.
+ *
+ * Strategy:
+ *  1. Strip parenthetical content  e.g. "(2024 Model, White)"
+ *  2. Remove the brand name        e.g. "LG", "Samsung"
+ *  3. Remove model-number tokens   e.g. "B0DWMQDYSZ", "KS-Q18YNZA"
+ *  4. Remove marketing noise words e.g. "New", "Best", "Latest"
+ *  5. Keep the first 6 meaningful words — those describe the core product
+ *
+ * Examples:
+ *  "LG 1.5 Ton 5 Star AI DUAL Inverter Split AC (2024, White)" + brand "LG"
+ *    → "1.5+Ton+5+Star+Inverter+Split+AC"
+ *
+ *  "Apple iPhone 15 Pro Max 256GB Natural Titanium" + brand "Apple"
+ *    → "iPhone+15+Pro+Max"
+ */
+const NOISE_WORDS = new Set([
+  "the", "and", "for", "with", "in", "of", "a", "an", "at", "by", "from",
+  "new", "latest", "updated", "best", "top", "premium", "original", "genuine",
+  "official", "certified", "authorized", "imported",
+  "black", "white", "silver", "gold", "blue", "red", "green", "grey", "gray",
+  "colour", "color", "pack", "set", "combo", "kit", "bundle",
+  "edition", "version", "series", "style", "design", "type",
+]);
+
+/** True if a word looks like a model/part number: 5+ chars, contains a digit */
+function isModelNumber(word: string): boolean {
+  return word.length >= 5 && /\d/.test(word) && /^[A-Za-z0-9\-_]+$/.test(word);
+}
+
+export function extractSearchKeywords(title: string, brand = ""): string {
+  // 1. Remove parenthetical content
+  let text = title.replace(/\(.*?\)/g, " ");
+
+  // 2. Remove brand name (case-insensitive, whole word)
+  if (brand.trim()) {
+    const escaped = brand.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    text = text.replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ");
+  }
+
+  // 3. Tokenise and filter
+  const kept = text
+    .split(/\s+/)
+    .filter((word) => {
+      const w = word.replace(/[^A-Za-z0-9.]/g, ""); // strip punctuation
+      if (!w || w.length < 2) return false;
+      if (isModelNumber(w)) return false;
+      if (NOISE_WORDS.has(w.toLowerCase())) return false;
+      return true;
+    })
+    .slice(0, 7);
+
+  return kept.join("+").replace(/[^A-Za-z0-9+.]/g, "");
+}
+
 export async function scrapeCompetitorAsins(
   productTitle: string,
   ownAsin: string,
-  marketplace: "in" | "com" = "com"
+  marketplace: "in" | "com" = "com",
+  brand = ""
 ): Promise<string[]> {
   const domain = getAmazonDomain(marketplace);
-  const keywords = productTitle
-    .split(" ")
-    .slice(0, 5)
-    .join("+")
-    .replace(/[^a-zA-Z0-9+]/g, "");
-  const searchUrl = `https://www.${domain}/s?k=${keywords}`;
+  const keywords = extractSearchKeywords(productTitle, brand);
+  logger.info({ keywords }, "Competitor search query");
+  const searchUrl = `https://www.${domain}/s?k=${encodeURIComponent(keywords.replace(/\+/g, " "))}`;
 
   let html: string;
   try {
