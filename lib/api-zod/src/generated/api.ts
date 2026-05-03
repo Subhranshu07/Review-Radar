@@ -60,6 +60,8 @@ export const GetReportResponse = zod.object({
   estimatedMonthlyRevenue: zod.number(),
   marketTotalRevenue: zod.number(),
   totalReviewsAnalyzed: zod.number(),
+  marketplace: zod.string(),
+  currencySymbol: zod.string(),
   status: zod.string(),
   createdAt: zod.string(),
   completedAt: zod.string(),
@@ -139,6 +141,7 @@ export const GetRecentReportsResponseItem = zod.object({
   shareToken: zod.string(),
   productTitle: zod.string(),
   marketTotalRevenue: zod.number(),
+  currencySymbol: zod.string(),
   createdAt: zod.string(),
 });
 export const GetRecentReportsResponse = zod.array(GetRecentReportsResponseItem);
@@ -154,6 +157,7 @@ export const GetReportHistoryResponseItem = zod.object({
   shareToken: zod.string(),
   productTitle: zod.string(),
   marketTotalRevenue: zod.number(),
+  currencySymbol: zod.string(),
   status: zod.string(),
   createdAt: zod.string(),
 });

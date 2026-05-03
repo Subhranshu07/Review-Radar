@@ -20,6 +20,23 @@ function randomDelay() {
   return sleep(1000 + Math.random() * 1000);
 }
 
+/** Returns "in" for amazon.in URLs, "com" for everything else */
+export function detectMarketplace(url: string): "in" | "com" {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (hostname === "amazon.in" || hostname === "www.amazon.in") return "in";
+  } catch {}
+  return "com";
+}
+
+export function getAmazonDomain(marketplace: "in" | "com"): string {
+  return marketplace === "in" ? "amazon.in" : "amazon.com";
+}
+
+export function getCurrencySymbol(marketplace: "in" | "com"): string {
+  return marketplace === "in" ? "₹" : "$";
+}
+
 async function fetchPage(url: string, attempt = 1): Promise<string> {
   try {
     await randomDelay();
@@ -83,6 +100,7 @@ export async function scrapeListing(url: string): Promise<ListingData> {
     $(".a-price .a-offscreen").first().text() ||
     $("#priceblock_ourprice").text() ||
     $("#priceblock_dealprice").text();
+  // Strip all non-numeric chars except decimal point — works for both $ and ₹
   const price = parseFloat(priceText.replace(/[^0-9.]/g, "")) || 0;
 
   const ratingText = $(".a-icon-alt").first().text();
@@ -124,14 +142,16 @@ export async function scrapeListing(url: string): Promise<ListingData> {
 
 export async function scrapeCompetitorAsins(
   productTitle: string,
-  ownAsin: string
+  ownAsin: string,
+  marketplace: "in" | "com" = "com"
 ): Promise<string[]> {
+  const domain = getAmazonDomain(marketplace);
   const keywords = productTitle
     .split(" ")
     .slice(0, 5)
     .join("+")
     .replace(/[^a-zA-Z0-9+]/g, "");
-  const searchUrl = `https://www.amazon.com/s?k=${keywords}`;
+  const searchUrl = `https://www.${domain}/s?k=${keywords}`;
 
   let html: string;
   try {
@@ -153,11 +173,16 @@ export async function scrapeCompetitorAsins(
   return asins.slice(0, 9);
 }
 
-export async function scrapeReviews(asin: string, maxPages = 5): Promise<Review[]> {
+export async function scrapeReviews(
+  asin: string,
+  maxPages = 5,
+  marketplace: "in" | "com" = "com"
+): Promise<Review[]> {
+  const domain = getAmazonDomain(marketplace);
   const reviews: Review[] = [];
 
   for (let page = 1; page <= maxPages; page++) {
-    const url = `https://www.amazon.com/product-reviews/${asin}?pageNumber=${page}&sortBy=recent`;
+    const url = `https://www.${domain}/product-reviews/${asin}?pageNumber=${page}&sortBy=recent`;
     let html: string;
     try {
       html = await fetchPage(url);

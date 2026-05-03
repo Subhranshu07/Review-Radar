@@ -10,6 +10,7 @@ export interface HistoryReport {
   shareToken: string;
   productTitle: string;
   marketTotalRevenue: number;
+  currencySymbol: string;
   status: string;
   createdAt: string;
 }

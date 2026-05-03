@@ -24,11 +24,13 @@ function generateShareToken(): string {
 function isValidAmazonUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return (
-      (parsed.hostname.includes("amazon.com") ||
-        parsed.hostname.includes("amazon.co.")) &&
-      /\/dp\/[A-Z0-9]{10}/.test(url)
-    );
+    const host = parsed.hostname.toLowerCase();
+    const isAmazon =
+      host === "amazon.com" ||
+      host === "www.amazon.com" ||
+      host === "amazon.in" ||
+      host === "www.amazon.in";
+    return isAmazon && /\/dp\/[A-Z0-9]{10}/.test(url);
   } catch {
     return false;
   }
@@ -215,6 +217,8 @@ router.get("/report/:shareToken", async (req, res) => {
     estimatedMonthlyRevenue: report.estimatedMonthlyRevenue,
     marketTotalRevenue: report.marketTotalRevenue,
     totalReviewsAnalyzed: report.totalReviewsAnalyzed,
+    marketplace: report.marketplace,
+    currencySymbol: report.currencySymbol,
     status: report.status,
     createdAt: report.createdAt?.toISOString() ?? "",
     completedAt: report.completedAt?.toISOString() ?? "",
@@ -254,6 +258,7 @@ router.get("/reports/recent", async (_req, res) => {
       shareToken: r.shareToken,
       productTitle: r.productTitle,
       marketTotalRevenue: r.marketTotalRevenue,
+      currencySymbol: r.currencySymbol,
       createdAt: r.createdAt?.toISOString() ?? "",
     }))
   );
@@ -268,6 +273,7 @@ router.get("/reports/history", async (req, res) => {
       shareToken: reportsTable.shareToken,
       productTitle: reportsTable.mainProductTitle,
       marketTotalRevenue: reportsTable.marketTotalRevenue,
+      currencySymbol: reportsTable.currencySymbol,
       status: reportsTable.status,
       createdAt: reportsTable.createdAt,
     })
@@ -288,6 +294,7 @@ router.get("/reports/history", async (req, res) => {
       shareToken: r.shareToken,
       productTitle: r.productTitle,
       marketTotalRevenue: r.marketTotalRevenue,
+      currencySymbol: r.currencySymbol,
       status: r.status,
       createdAt: r.createdAt?.toISOString() ?? "",
     }))

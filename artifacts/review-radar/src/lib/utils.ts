@@ -5,18 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(value: number): string {
+export function formatCurrency(value: number, symbol = "$"): string {
   if (value >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(1)}M`;
+    return `${symbol}${(value / 1_000_000).toFixed(1)}M`;
   }
   if (value >= 1_000) {
-    return `$${Math.round(value / 1_000).toLocaleString()}K`;
+    return `${symbol}${Math.round(value / 1_000).toLocaleString()}K`;
   }
-  return `$${Math.round(value).toLocaleString()}`;
+  return `${symbol}${Math.round(value).toLocaleString()}`;
 }
 
-export function formatCurrencyFull(value: number): string {
-  return `$${Math.round(value).toLocaleString()}`;
+export function formatCurrencyFull(value: number, symbol = "$"): string {
+  return `${symbol}${Math.round(value).toLocaleString()}`;
 }
 
 export function formatDate(dateStr: string): string {

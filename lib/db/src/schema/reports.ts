@@ -17,6 +17,8 @@ export const reportsTable = pgTable("reports", {
   estimatedMonthlyRevenue: real("estimated_monthly_revenue").notNull().default(0),
   marketTotalRevenue: real("market_total_revenue").notNull().default(0),
   totalReviewsAnalyzed: integer("total_reviews_analyzed").notNull().default(0),
+  marketplace: text("marketplace").notNull().default("com"),
+  currencySymbol: text("currency_symbol").notNull().default("$"),
   status: text("status").notNull().default("PENDING"),
   progressMessage: text("progress_message").notNull().default("Starting analysis..."),
   percentComplete: real("percent_complete").notNull().default(0),

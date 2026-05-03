@@ -10,5 +10,6 @@ export interface RecentReport {
   shareToken: string;
   productTitle: string;
   marketTotalRevenue: number;
+  currencySymbol: string;
   createdAt: string;
 }
