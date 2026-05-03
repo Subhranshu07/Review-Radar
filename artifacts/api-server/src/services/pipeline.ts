@@ -94,21 +94,33 @@ export async function runPipeline(reportId: number, listingUrl: string) {
       logger.warn({ err }, "Failed to scrape main product reviews");
     }
 
-    // Scrape competitor listings and reviews
+    // Scrape competitor listings and reviews — skip same-brand products
     const competitorListings: { title: string; bulletPoints: string; revenue: number; asin: string }[] = [];
     let totalMarketRevenue = mainRevenue;
+    const mainBrand = (mainListing.brand || "").toLowerCase().trim();
+    let competitorPosition = 1;
 
-    for (let i = 0; i < competitorAsins.length; i++) {
+    for (let i = 0; i < competitorAsins.length && competitorListings.length < 9; i++) {
       const asin = competitorAsins[i];
       const url = `https://www.${domain}/dp/${asin}`;
-      const pct = 15 + Math.round(((i + 1) / competitorAsins.length) * 25);
-      await updateProgress(reportId, `Collecting competitor data (${i + 1}/${competitorAsins.length})...`, pct);
+      await updateProgress(
+        reportId,
+        `Collecting competitor data (${competitorListings.length + 1}/9)...`,
+        15 + Math.round(((competitorListings.length + 1) / 9) * 25)
+      );
 
       let listing;
       try {
         listing = await scrapeListing(url);
       } catch {
         logger.warn({ asin }, "Failed to scrape competitor listing, skipping");
+        continue;
+      }
+
+      // Skip products from the same brand — we want true competitors
+      const listingBrand = (listing.brand || "").toLowerCase().trim();
+      if (mainBrand && listingBrand && listingBrand === mainBrand) {
+        logger.info({ asin, brand: listing.brand }, "Skipping same-brand product");
         continue;
       }
 
@@ -127,7 +139,7 @@ export async function runPipeline(reportId: number, listingUrl: string) {
         bsr: listing.bsr,
         estimatedMonthlyRevenue: compRevenue,
         bulletPoints: listing.bulletPoints,
-        position: i + 1,
+        position: competitorPosition++,
       });
 
       try {
