@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from "react";
-import { useParams, useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useParams } from "wouter";
 import { motion } from "framer-motion";
 import {
   Share2, Printer, AlertTriangle, ChevronRight, Copy, Check,
-  TrendingUp, TrendingDown, DollarSign, Users, BarChart2, Loader2
+  TrendingUp, DollarSign, Users, BarChart2, Loader2
 } from "lucide-react";
 import { useGetReport, getGetReportQueryKey } from "@workspace/api-client-react";
 import { Nav } from "@/components/nav";
-import { formatCurrency, formatCurrencyFull, formatDate, formatNumber, cn } from "@/lib/utils";
+import { formatCurrency, formatDate, formatNumber, cn } from "@/lib/utils";
 import type { FullReport, FixAction, Complaint, PurchaseDriver, CompetitorAdvantage, MarketingAngle } from "@workspace/api-client-react";
 
 function useCountUp(target: number, duration = 1200) {
@@ -138,6 +138,7 @@ export default function Report() {
   }
 
   const a = report.analysis;
+  const sym = report.currencySymbol || "$";
   const marketShare = report.marketTotalRevenue > 0
     ? (report.estimatedMonthlyRevenue / report.marketTotalRevenue) * 100
     : 0;
@@ -188,8 +189,8 @@ export default function Report() {
         <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Market Snapshot</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard label="Total Market Size" value={Math.round(report.marketTotalRevenue)} icon={DollarSign} prefix="$" suffix="/mo" />
-            <StatCard label="Your Est. Revenue" value={Math.round(report.estimatedMonthlyRevenue)} icon={TrendingUp} prefix="$" suffix="/mo" />
+            <StatCard label="Total Market Size" value={Math.round(report.marketTotalRevenue)} icon={DollarSign} prefix={sym} suffix="/mo" />
+            <StatCard label="Your Est. Revenue" value={Math.round(report.estimatedMonthlyRevenue)} icon={TrendingUp} prefix={sym} suffix="/mo" />
             <div className="p-5 rounded-xl bg-card border border-border">
               <div className="flex items-start justify-between mb-4">
                 <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Market Share</span>
@@ -336,10 +337,10 @@ export default function Report() {
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground text-xs line-clamp-2">{report.mainProductTitle}</p>
                       </td>
-                      <td className="px-4 py-3 text-right text-xs text-foreground">${report.mainProductPrice.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right text-xs text-foreground">{sym}{report.mainProductPrice.toFixed(2)}</td>
                       <td className="px-4 py-3 text-right text-xs text-foreground">{report.mainProductRating.toFixed(1)}</td>
                       <td className="px-4 py-3 text-right text-xs text-foreground">{formatNumber(report.mainProductReviewCount)}</td>
-                      <td className="px-4 py-3 text-right text-xs text-primary font-semibold">{formatCurrency(report.estimatedMonthlyRevenue)}/mo</td>
+                      <td className="px-4 py-3 text-right text-xs text-primary font-semibold">{formatCurrency(report.estimatedMonthlyRevenue, sym)}/mo</td>
                     </tr>
                     {report.competitors.map((comp, i) => (
                       <tr key={comp.id} className="hover:bg-secondary/30 transition-colors" data-testid={`row-competitor-${comp.id}`}>
@@ -347,10 +348,10 @@ export default function Report() {
                         <td className="px-4 py-3">
                           <p className="text-xs text-foreground line-clamp-2">{comp.productTitle}</p>
                         </td>
-                        <td className="px-4 py-3 text-right text-xs text-foreground">${comp.price.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-xs text-foreground">{sym}{comp.price.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right text-xs text-foreground">{comp.rating.toFixed(1)}</td>
                         <td className="px-4 py-3 text-right text-xs text-foreground">{formatNumber(comp.reviewCount)}</td>
-                        <td className="px-4 py-3 text-right text-xs text-muted-foreground">{formatCurrency(comp.estimatedMonthlyRevenue)}/mo</td>
+                        <td className="px-4 py-3 text-right text-xs text-muted-foreground">{formatCurrency(comp.estimatedMonthlyRevenue, sym)}/mo</td>
                       </tr>
                     ))}
                   </tbody>
@@ -479,7 +480,7 @@ export default function Report() {
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Just analyzed my Amazon market with Review Radar.<br />
                 Found {a.fixRightNow.length} critical gaps competitors are exploiting.<br />
-                Market size: {formatCurrency(report.marketTotalRevenue)}/month.<br />
+                Market size: {formatCurrency(report.marketTotalRevenue, sym)}/month.<br />
                 Get your free analysis → {window.location.href}
               </p>
             </div>

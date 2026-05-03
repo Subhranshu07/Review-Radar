@@ -22,8 +22,10 @@ export default function Home() {
       setError("Please enter an Amazon product URL");
       return;
     }
-    if (!url.includes("amazon.com") || !url.includes("/dp/")) {
-      setError("Please enter a valid Amazon product URL (e.g. https://www.amazon.com/dp/B08...)");
+    const isAmazonCom = url.includes("amazon.com") && url.includes("/dp/");
+    const isAmazonIn = url.includes("amazon.in") && url.includes("/dp/");
+    if (!isAmazonCom && !isAmazonIn) {
+      setError("Please enter a valid Amazon product URL (amazon.com or amazon.in, e.g. https://www.amazon.in/dp/B08...)");
       return;
     }
     analyze.mutate(
@@ -80,7 +82,7 @@ export default function Home() {
                     type="url"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://www.amazon.com/dp/B08..."
+                    placeholder="https://www.amazon.com/dp/B08... or amazon.in/dp/..."
                     className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
                     data-testid="input-amazon-url"
                     disabled={analyze.isPending}
@@ -174,7 +176,7 @@ export default function Home() {
                   </p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-primary font-semibold">
-                      {formatCurrency(report.marketTotalRevenue)}/mo market
+                      {formatCurrency(report.marketTotalRevenue, report.currencySymbol)}/mo market
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {formatDate(report.createdAt)}

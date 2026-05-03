@@ -23,6 +23,8 @@ export interface FullReport {
   estimatedMonthlyRevenue: number;
   marketTotalRevenue: number;
   totalReviewsAnalyzed: number;
+  marketplace: string;
+  currencySymbol: string;
   status: string;
   createdAt: string;
   completedAt: string;

@@ -12,6 +12,9 @@ import {
   scrapeReviews,
   estimateMonthlyRevenue,
   extractAsinFromUrl,
+  detectMarketplace,
+  getAmazonDomain,
+  getCurrencySymbol,
 } from "./scraper";
 import {
   runCustomerAnalyst,
@@ -39,6 +42,10 @@ async function updateProgress(
 
 export async function runPipeline(reportId: number, listingUrl: string) {
   try {
+    const marketplace = detectMarketplace(listingUrl);
+    const domain = getAmazonDomain(marketplace);
+    const currencySymbol = getCurrencySymbol(marketplace);
+
     await updateProgress(reportId, "Fetching your listing...", 5);
 
     let mainListing;
@@ -67,6 +74,8 @@ export async function runPipeline(reportId: number, listingUrl: string) {
         mainProductBsr: mainListing.bsr,
         mainProductBullets: mainListing.bulletPoints,
         estimatedMonthlyRevenue: mainRevenue,
+        marketplace,
+        currencySymbol,
       })
       .where(eq(reportsTable.id, reportId));
 
@@ -74,7 +83,7 @@ export async function runPipeline(reportId: number, listingUrl: string) {
 
     let competitorAsins: string[] = [];
     try {
-      competitorAsins = await scrapeCompetitorAsins(mainListing.title, mainListing.asin);
+      competitorAsins = await scrapeCompetitorAsins(mainListing.title, mainListing.asin, marketplace);
     } catch (err) {
       logger.warn({ err }, "Failed to find competitor ASINs");
     }
@@ -85,7 +94,7 @@ export async function runPipeline(reportId: number, listingUrl: string) {
 
     // Scrape main product reviews
     try {
-      const mainReviews = await scrapeReviews(mainListing.asin);
+      const mainReviews = await scrapeReviews(mainListing.asin, 5, marketplace);
       allReviews.push(...mainReviews);
     } catch (err) {
       logger.warn({ err }, "Failed to scrape main product reviews");
@@ -97,7 +106,7 @@ export async function runPipeline(reportId: number, listingUrl: string) {
 
     for (let i = 0; i < competitorAsins.length; i++) {
       const asin = competitorAsins[i];
-      const url = `https://www.amazon.com/dp/${asin}`;
+      const url = `https://www.${domain}/dp/${asin}`;
       const pct = 15 + Math.round(((i + 1) / competitorAsins.length) * 25);
       await updateProgress(reportId, `Collecting competitor data (${i + 1}/${competitorAsins.length})...`, pct);
 
@@ -128,7 +137,7 @@ export async function runPipeline(reportId: number, listingUrl: string) {
       });
 
       try {
-        const compReviews = await scrapeReviews(asin, 3);
+        const compReviews = await scrapeReviews(asin, 3, marketplace);
         allReviews.push(...compReviews);
       } catch {
         logger.warn({ asin }, "Failed to scrape competitor reviews, skipping");

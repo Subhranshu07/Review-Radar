@@ -209,9 +209,11 @@ components:
           type: string
         marketTotalRevenue:
           type: number
+        currencySymbol:
+          type: string
         createdAt:
           type: string
-      required: [shareToken, productTitle, marketTotalRevenue, createdAt]
+      required: [shareToken, productTitle, marketTotalRevenue, currencySymbol, createdAt]
 
     HistoryReport:
       type: object
@@ -222,11 +224,13 @@ components:
           type: string
         marketTotalRevenue:
           type: number
+        currencySymbol:
+          type: string
         status:
           type: string
         createdAt:
           type: string
-      required: [shareToken, productTitle, marketTotalRevenue, status, createdAt]
+      required: [shareToken, productTitle, marketTotalRevenue, currencySymbol, status, createdAt]
 
     StatsResponse:
       type: object
@@ -446,6 +450,10 @@ components:
           type: number
         totalReviewsAnalyzed:
           type: number
+        marketplace:
+          type: string
+        currencySymbol:
+          type: string
         status:
           type: string
         createdAt:
@@ -473,6 +481,8 @@ components:
         - estimatedMonthlyRevenue
         - marketTotalRevenue
         - totalReviewsAnalyzed
+        - marketplace
+        - currencySymbol
         - status
         - createdAt
         - completedAt

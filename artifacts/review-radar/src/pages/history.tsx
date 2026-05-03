@@ -108,7 +108,7 @@ export default function History() {
                         {formatDate(report.createdAt)}
                       </td>
                       <td className="px-4 py-3 text-right text-xs font-semibold text-primary whitespace-nowrap">
-                        {report.marketTotalRevenue > 0 ? `${formatCurrency(report.marketTotalRevenue)}/mo` : "—"}
+                        {report.marketTotalRevenue > 0 ? `${formatCurrency(report.marketTotalRevenue, report.currencySymbol)}/mo` : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={report.status} />

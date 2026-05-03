@@ -41,6 +41,7 @@ export interface RecentReport {
   shareToken: string;
   productTitle: string;
   marketTotalRevenue: number;
+  currencySymbol: string;
   createdAt: string;
 }
 
@@ -48,6 +49,7 @@ export interface HistoryReport {
   shareToken: string;
   productTitle: string;
   marketTotalRevenue: number;
+  currencySymbol: string;
   status: string;
   createdAt: string;
 }
@@ -139,6 +141,8 @@ export interface FullReport {
   estimatedMonthlyRevenue: number;
   marketTotalRevenue: number;
   totalReviewsAnalyzed: number;
+  marketplace: string;
+  currencySymbol: string;
   status: string;
   createdAt: string;
   completedAt: string;
