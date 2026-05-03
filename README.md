@@ -29,7 +29,7 @@ Set environment variables in `artifacts/api-server/.env`:
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/review_radar
 GROQ_API_KEY=your_groq_key
-SCRAPERAPI_KEY=your_scraperapi_key   # optional
+SCRAPERAPI_KEY=your_scraperapi_key   
 SESSION_SECRET=any_random_string
 PORT=8080
 ```
