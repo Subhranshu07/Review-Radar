@@ -3,20 +3,23 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Review Radar API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: reports
+    description: Report operations
+  - name: analysis
+    description: Analysis operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +27,137 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /analyze:
+    post:
+      operationId: analyzeProduct
+      tags: [reports]
+      summary: Start analysis for an Amazon product URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeRequest"
+      responses:
+        "200":
+          description: Analysis started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyzeResponse"
+        "400":
+          description: Invalid URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /status/{shareToken}:
+    get:
+      operationId: getStatus
+      tags: [reports]
+      summary: Get processing status for a report
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Status info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /report/{shareToken}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: Get full report
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FullReport"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /reports/recent:
+    get:
+      operationId: getRecentReports
+      tags: [reports]
+      summary: Get recent completed reports
+      responses:
+        "200":
+          description: Recent reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecentReport"
+
+  /reports/history:
+    get:
+      operationId: getReportHistory
+      tags: [reports]
+      summary: Get all reports for history page
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: All reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HistoryReport"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [reports]
+      summary: Get global stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +165,316 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    AnalyzeRequest:
+      type: object
+      properties:
+        listingUrl:
+          type: string
+      required: [listingUrl]
+
+    AnalyzeResponse:
+      type: object
+      properties:
+        shareToken:
+          type: string
+      required: [shareToken]
+
+    StatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETE, FAILED]
+        progressMessage:
+          type: string
+        percentComplete:
+          type: number
+      required: [status, progressMessage, percentComplete]
+
+    RecentReport:
+      type: object
+      properties:
+        shareToken:
+          type: string
+        productTitle:
+          type: string
+        marketTotalRevenue:
+          type: number
+        createdAt:
+          type: string
+      required: [shareToken, productTitle, marketTotalRevenue, createdAt]
+
+    HistoryReport:
+      type: object
+      properties:
+        shareToken:
+          type: string
+        productTitle:
+          type: string
+        marketTotalRevenue:
+          type: number
+        status:
+          type: string
+        createdAt:
+          type: string
+      required: [shareToken, productTitle, marketTotalRevenue, status, createdAt]
+
+    StatsResponse:
+      type: object
+      properties:
+        totalReportsGenerated:
+          type: number
+        totalReviewsAnalyzed:
+          type: number
+      required: [totalReportsGenerated, totalReviewsAnalyzed]
+
+    PurchaseDriver:
+      type: object
+      properties:
+        driver:
+          type: string
+        percentage:
+          type: number
+        examplePhrase:
+          type: string
+      required: [driver, percentage, examplePhrase]
+
+    Complaint:
+      type: object
+      properties:
+        complaint:
+          type: string
+        severity:
+          type: string
+        frequency:
+          type: string
+        exampleQuote:
+          type: string
+      required: [complaint, severity, frequency, exampleQuote]
+
+    FixAction:
+      type: object
+      properties:
+        action:
+          type: string
+        impact:
+          type: string
+        effort:
+          type: string
+        reasoning:
+          type: string
+      required: [action, impact, effort, reasoning]
+
+    CompetitorAdvantage:
+      type: object
+      properties:
+        point:
+          type: string
+        howManyCompetitorsMention:
+          type: number
+      required: [point, howManyCompetitorsMention]
+
+    MarketingAngle:
+      type: object
+      properties:
+        angle:
+          type: string
+        targetAudience:
+          type: string
+        hook:
+          type: string
+      required: [angle, targetAudience, hook]
+
+    Competitor:
+      type: object
+      properties:
+        id:
+          type: number
+        productTitle:
+          type: string
+        asin:
+          type: string
+        brand:
+          type: string
+        price:
+          type: number
+        rating:
+          type: number
+        reviewCount:
+          type: number
+        bsr:
+          type: number
+        estimatedMonthlyRevenue:
+          type: number
+        bulletPoints:
+          type: string
+        position:
+          type: number
+      required: [id, productTitle, asin, brand, price, rating, reviewCount, bsr, estimatedMonthlyRevenue, bulletPoints, position]
+
+    AnalysisResult:
+      type: object
+      properties:
+        purchaseDrivers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseDriver"
+        keyPhrases:
+          type: array
+          items:
+            type: string
+        buyerPersona:
+          type: string
+        emotionalTriggers:
+          type: array
+          items:
+            type: string
+        topComplaints:
+          type: array
+          items:
+            $ref: "#/components/schemas/Complaint"
+        returnReasons:
+          type: array
+          items:
+            type: string
+        unmetExpectations:
+          type: array
+          items:
+            type: string
+        competitorAdvantages:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompetitorAdvantage"
+        productWeaknesses:
+          type: array
+          items:
+            type: string
+        productStrengths:
+          type: array
+          items:
+            type: string
+        missedPositioning:
+          type: array
+          items:
+            type: string
+        fixRightNow:
+          type: array
+          items:
+            $ref: "#/components/schemas/FixAction"
+        featureGaps:
+          type: array
+          items:
+            type: string
+        quickWins:
+          type: array
+          items:
+            type: string
+        improvedTitle:
+          type: string
+        improvedBullets:
+          type: array
+          items:
+            type: string
+        marketingAngles:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarketingAngle"
+        adHeadlines:
+          type: array
+          items:
+            type: string
+        toneAndVoiceNotes:
+          type: string
+      required:
+        - purchaseDrivers
+        - keyPhrases
+        - buyerPersona
+        - emotionalTriggers
+        - topComplaints
+        - returnReasons
+        - unmetExpectations
+        - competitorAdvantages
+        - productWeaknesses
+        - productStrengths
+        - missedPositioning
+        - fixRightNow
+        - featureGaps
+        - quickWins
+        - improvedTitle
+        - improvedBullets
+        - marketingAngles
+        - adHeadlines
+        - toneAndVoiceNotes
+
+    FullReport:
+      type: object
+      properties:
+        id:
+          type: number
+        shareToken:
+          type: string
+        mainListingUrl:
+          type: string
+        mainProductTitle:
+          type: string
+        mainProductAsin:
+          type: string
+        mainProductBrand:
+          type: string
+        mainProductPrice:
+          type: number
+        mainProductRating:
+          type: number
+        mainProductReviewCount:
+          type: number
+        mainProductBsr:
+          type: number
+        mainProductBullets:
+          type: string
+        estimatedMonthlyRevenue:
+          type: number
+        marketTotalRevenue:
+          type: number
+        totalReviewsAnalyzed:
+          type: number
+        status:
+          type: string
+        createdAt:
+          type: string
+        completedAt:
+          type: string
+        analysis:
+          $ref: "#/components/schemas/AnalysisResult"
+        competitors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Competitor"
+      required:
+        - id
+        - shareToken
+        - mainListingUrl
+        - mainProductTitle
+        - mainProductAsin
+        - mainProductBrand
+        - mainProductPrice
+        - mainProductRating
+        - mainProductReviewCount
+        - mainProductBsr
+        - mainProductBullets
+        - estimatedMonthlyRevenue
+        - marketTotalRevenue
+        - totalReviewsAnalyzed
+        - status
+        - createdAt
+        - completedAt
+        - analysis
+        - competitors
