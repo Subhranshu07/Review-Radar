@@ -1,0 +1,578 @@
+Build a full-stack web application called "Review Radar — 
+Customer Decision Engine".
+
+Core idea: Turn messy Amazon reviews into clear, actionable 
+product and marketing decisions for e-commerce sellers.
+
+---
+
+## USER FLOW
+
+1. User pastes an Amazon product URL
+2. App scrapes that listing + automatically finds 
+   and scrapes 9 competitor listings in the same category
+3. Collects 500–1000 reviews across all listings
+4. Runs a multi-role AI pipeline using Groq
+5. Displays a Decision Dashboard with insights, gaps, 
+   and ready-to-use listing copy
+
+---
+
+## SCRAPING LOGIC
+
+### Step 1 — Scrape Main Listing
+From the Amazon URL the user provides, extract:
+- Product title
+- Brand name
+- Price
+- Star rating
+- Total review count
+- Best Seller Rank (BSR) — parse from product details section
+- ASIN — extract from URL pattern /dp/XXXXXXXXXX/
+- Bullet points (the 5 feature bullets)
+
+### Step 2 — Find 9 Competitors
+Using the product title keywords, construct an Amazon 
+search URL and scrape the first 9 ASINs that are not 
+the user's own product. Then scrape each competitor's 
+listing for the same fields above.
+
+### Step 3 — Scrape Reviews
+For each listing (main + 9 competitors):
+- Scrape up to 5 pages of reviews
+- From each review extract: star rating, title, body text
+- Target: 50–100 reviews per listing
+
+### Step 4 — Headers to avoid blocks
+Use these headers on every scraping request:
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) 
+AppleWebKit/537.36 (KHTML, like Gecko) 
+Chrome/120.0.0.0 Safari/537.36
+Accept-Language: en-US,en;q=0.9
+
+Add a 1–2 second random delay between each request.
+
+### Step 5 — ScraperAPI fallback
+If any request returns a CAPTCHA or bot-detection page 
+(check if response body contains "robot" or "captcha"),
+retry through ScraperAPI:
+http://api.scraperapi.com?api_key={SCRAPERAPI_KEY}&url={encodedUrl}
+
+---
+
+## AI PIPELINE — GROQ MULTI-ROLE SYSTEM
+
+Use Groq API with model: llama-3.3-70b-versatile
+Base URL: https://api.groq.com/openai/v1/chat/completions
+
+Run these 5 AI roles sequentially. Each is a separate 
+Groq API call with a different system prompt.
+Add 500ms delay between each call to respect rate limits.
+All responses must be returned as JSON only — 
+strip any markdown code fences before parsing.
+Wrap all JSON parsing in try/catch with fallback empty arrays.
+
+---
+
+### ROLE 1 — Customer Analyst
+System prompt:
+"You are a customer psychology expert specializing in 
+e-commerce. Analyze product reviews to identify what 
+drives purchase decisions. Respond in valid JSON only, 
+no other text."
+
+User prompt:
+"Analyze these Amazon reviews for '{productTitle}':
+
+{reviews — truncated to 6000 characters, 
+most recent first}
+
+Return this exact JSON structure:
+{
+  'topPurchaseDrivers': [
+    {'driver': string, 'percentage': number, 
+     'examplePhrase': string}
+  ],
+  'keyPhrasesCustomersUse': [string, string, string, 
+    string, string],
+  'primaryBuyerPersona': string,
+  'emotionalTriggers': [string, string, string]
+}
+topPurchaseDrivers should have exactly 5 items, 
+ordered by frequency. percentage is your estimate 
+of how many reviewers mentioned this."
+
+---
+
+### ROLE 2 — Complaint Detector
+System prompt:
+"You are an expert at identifying product failures 
+and customer frustrations from Amazon reviews. 
+Respond in valid JSON only, no other text."
+
+User prompt:
+"Analyze complaints and negative patterns in 
+these reviews for '{productTitle}':
+
+{same reviews as Role 1}
+
+Return this exact JSON:
+{
+  'topComplaints': [
+    {'complaint': string, 'severity': 'HIGH/MEDIUM/LOW', 
+     'frequency': string, 'exampleQuote': string}
+  ],
+  'returnReasons': [string, string, string],
+  'unmetExpectations': [string, string, string],
+  'qualityIssues': [string, string]
+}
+topComplaints should have exactly 5 items."
+
+---
+
+### ROLE 3 — Competitor Strategist
+System prompt:
+"You are a competitive intelligence analyst for 
+Amazon e-commerce. Respond in valid JSON only."
+
+User prompt:
+"Compare the main product against its competitors.
+
+Main product: '{mainProductTitle}'
+Main product bullet points: {mainBulletPoints}
+Main product top complaints: {complaintsFromRole2}
+
+Competitor listings:
+{for each competitor: title + bullet points, 
+formatted as numbered list}
+
+Return this exact JSON:
+{
+  'whatCompetitorsEmphasizeBetter': [
+    {'point': string, 'howManyCompetitorsMention': number}
+  ],
+  'mainProductWeaknesses': [string, string, string],
+  'mainProductStrengths': [string, string, string],
+  'missedPositioningOpportunities': [string, string, string]
+}
+whatCompetitorsEmphasizeBetter should have 4-5 items."
+
+---
+
+### ROLE 4 — Product Manager
+System prompt:
+"You are a senior product manager for an e-commerce 
+brand. Your job is to prioritize improvements based 
+on customer evidence. Respond in valid JSON only."
+
+User prompt:
+"Based on this analysis for '{productTitle}':
+
+Customer top complaints: {complaintsFromRole2}
+Competitor advantages: {competitorDataFromRole3}
+Unmet expectations: {unmetExpectationsFromRole2}
+
+Return this exact JSON:
+{
+  'fixRightNow': [
+    {'action': string, 'impact': 'HIGH/MEDIUM', 
+     'effort': 'EASY/MEDIUM/HARD', 'reasoning': string}
+  ],
+  'featureGaps': [string, string, string],
+  'quickWins': [string, string, string]
+}
+fixRightNow should have exactly 5 items, 
+ranked by impact. This is the most important 
+output — be very specific and actionable."
+
+---
+
+### ROLE 5 — Copywriter
+System prompt:
+"You are an expert Amazon listing copywriter. 
+You write conversion-optimized copy based on 
+real customer language and psychology. 
+Respond in valid JSON only."
+
+User prompt:
+"Rewrite the listing for '{productTitle}' 
+based on this research:
+
+Current title: {currentTitle}
+Current bullet points: {currentBullets}
+Top purchase drivers: {driversFromRole1}
+Key customer phrases: {phrasesFromRole1}
+Top complaints to address: {complaintsFromRole2}
+Missed positioning: {missedPositioningFromRole3}
+
+Return this exact JSON:
+{
+  'improvedTitle': string,
+  'improvedBullets': [string, string, string, 
+    string, string],
+  'marketingAngles': [
+    {'angle': string, 'targetAudience': string, 
+     'hook': string}
+  ],
+  'suggestedAdHeadlines': [string, string, string],
+  'toneAndVoiceNotes': string
+}
+improvedTitle must be under 200 characters.
+Each bullet must start with a benefit, 
+not a feature. marketingAngles should have 3 items."
+
+---
+
+## REVENUE ESTIMATION (no AI needed — pure math)
+
+Use this BSR-to-monthly-revenue formula:
+
+BSR 1-100 → 150 units/day
+BSR 101-500 → 80 units/day  
+BSR 501-1000 → 50 units/day
+BSR 1001-5000 → 25 units/day
+BSR 5001-10000 → 12 units/day
+BSR 10001-50000 → 5 units/day
+BSR 50001-100000 → 2 units/day
+BSR 100000+ → 0.5 units/day
+
+Monthly revenue = dailyUnits × 30 × price
+
+Calculate this for all 10 listings.
+Total market size = sum of all 10 monthly revenues.
+
+---
+
+## DATABASE
+
+Use the built-in Replit database or SQLite.
+
+Store these tables:
+
+reports:
+- id (unique, auto-generated)
+- share_token (8 character random alphanumeric, unique)
+- main_listing_url
+- main_product_title
+- main_product_asin
+- main_product_brand
+- main_product_price
+- main_product_rating
+- main_product_review_count
+- main_product_bsr
+- estimated_monthly_revenue
+- market_total_revenue
+- status (PENDING / PROCESSING / COMPLETE / FAILED)
+- progress_message
+- percent_complete
+- created_at
+- completed_at
+
+analysis_results:
+- id
+- report_id (foreign key)
+- purchase_drivers (JSON stored as text)
+- key_phrases (JSON stored as text)
+- buyer_persona (text)
+- emotional_triggers (JSON stored as text)
+- top_complaints (JSON stored as text)
+- return_reasons (JSON stored as text)
+- unmet_expectations (JSON stored as text)
+- competitor_advantages (JSON stored as text)
+- product_weaknesses (JSON stored as text)
+- fix_right_now (JSON stored as text)
+- feature_gaps (JSON stored as text)
+- quick_wins (JSON stored as text)
+- improved_title (text)
+- improved_bullets (JSON stored as text)
+- marketing_angles (JSON stored as text)
+- ad_headlines (JSON stored as text)
+
+competitors:
+- id
+- report_id (foreign key)
+- product_title
+- asin
+- brand
+- price
+- rating
+- review_count
+- bsr
+- estimated_monthly_revenue
+- bullet_points (text)
+- position (1-9)
+
+---
+
+## REST API ENDPOINTS
+
+POST /api/analyze
+Body: { "listingUrl": "https://www.amazon.com/dp/..." }
+- Validate it is an Amazon product URL
+- Create report with status=PENDING, generate share_token
+- Return immediately: { "shareToken": "abc12345" }
+- Start all processing in the background asynchronously
+
+GET /api/status/{shareToken}
+Returns:
+{
+  "status": "PROCESSING",
+  "progressMessage": "Analyzing reviews with AI... (Role 2 of 5)",
+  "percentComplete": 40
+}
+
+GET /api/report/{shareToken}
+Returns the full report with all analysis results 
+and competitor data.
+
+GET /api/reports/recent
+Returns last 10 completed reports for homepage display.
+Only return: productTitle, shareToken, marketTotalRevenue, 
+createdAt
+
+GET /api/stats
+Returns:
+{
+  "totalReportsGenerated": number,
+  "totalReviewsAnalyzed": number
+}
+
+---
+
+## FRONTEND PAGES
+
+### Page 1 — Home (/)
+
+Dark premium design.
+Background: very dark navy #0A0F1E
+Accent color: indigo #6366F1
+
+Hero section:
+- Headline (large, bold, white):
+  "Your competitors are winning. Find out exactly why."
+- Subheading (gray):
+  "Paste any Amazon listing. Get 1000+ reviews analyzed, 
+  competitor gaps found, and your listing rewritten — 
+  in under 2 minutes."
+- Large URL input field
+- Button: "Analyze My Market" with loading spinner
+- Small text below: "Analyzes your listing + 9 competitors 
+  + 500-1000 reviews"
+
+Stats bar (pull from /api/stats):
+"{totalReports} markets analyzed • {totalReviews} reviews processed"
+
+Recent reports (pull from /api/reports/recent):
+Grid of cards showing recent analyses.
+Each card: product name, market size, date.
+Clicking opens that report.
+
+### Processing State (shown after URL submitted)
+
+Full screen overlay or dedicated section:
+Animated progress bar
+Live status message updating every 3 seconds 
+(poll /api/status/{shareToken})
+
+Step indicators with icons:
+✅ Finding your listing
+⏳ Discovering 9 competitors
+⏳ Collecting reviews  
+⏳ Customer Analyst running...
+⏳ Complaint Detector running...
+⏳ Competitor Strategist running...
+⏳ Product Manager running...
+⏳ Copywriter running...
+⏳ Building your dashboard...
+
+When status=COMPLETE, automatically navigate to /report/{shareToken}
+When status=FAILED, show error message with retry button.
+
+### Page 2 — Report Dashboard (/report/{shareToken})
+
+This is the hero page. Make it look like a premium 
+SaaS analytics dashboard, not a basic webpage.
+
+--- HEADER ---
+Product name + brand (large)
+"Market Analysis Report • Generated {date}"
+Share button (copies URL to clipboard)
+Print/Download button (triggers window.print())
+
+--- SECTION 1: MARKET SNAPSHOT ---
+4 stat cards in a row:
+- Total Market Size: "$X,XXX,XXX / month"
+- Your Est. Revenue: "$XX,XXX / month"  
+- Your Market Share: "X.X%"
+- Reviews Analyzed: "X,XXX"
+
+Numbers animate counting up on page load.
+
+--- SECTION 2: AI DECISION MODE ---
+(Make this the most prominent section — put it high up)
+
+Title: "🚨 What You Should Fix RIGHT NOW"
+Subtitle: "Ranked by impact. Based on real customer data."
+
+5 action cards, each showing:
+- Priority badge: HIGH IMPACT or MEDIUM IMPACT 
+  (red or orange background)
+- Effort badge: EASY / MEDIUM / HARD 
+  (green / yellow / red)
+- Action title (bold)
+- Reasoning (1-2 sentences from AI)
+
+This section should feel urgent and scannable.
+
+--- SECTION 3: CUSTOMER INSIGHTS ---
+Two column layout:
+
+Left column — "What Drives Purchases"
+Horizontal bar chart showing top 5 purchase drivers 
+with percentages.
+e.g.: "Absorption speed ████████ 67%"
+Below each bar: example customer phrase in italic
+
+Right column — "Top Complaints"
+5 complaint cards, each with:
+- Severity badge (HIGH/MEDIUM/LOW)
+- Complaint title
+- Frequency note
+- Real customer quote (from exampleQuote field)
+
+Below both columns:
+"Key Phrases Your Customers Use"
+Tag cloud / badge row of 5-8 phrases
+e.g.: [easy to swallow] [no aftertaste] [actually works] 
+[third party tested]
+
+--- SECTION 4: COMPETITIVE GAP ANALYSIS ---
+Title: "Where Competitors Are Beating You"
+
+Table showing competitors:
+Rank | Product | Price | Rating | Reviews | Est. Revenue
+
+Your product highlighted in indigo row.
+Bar chart below table showing revenue comparison.
+
+Below table:
+"What Competitors Emphasize (That You Don't)"
+List of 4-5 points with how many competitors mention each.
+
+"Your Missed Positioning Opportunities"
+3 cards with specific missed opportunities from AI.
+
+--- SECTION 5: INSTANT FIX GENERATOR ---
+Title: "Your Listing, Rewritten"
+Subtitle: "Based on real customer language and competitor gaps"
+
+Split view:
+Left panel — "Current Listing" (gray/dark background)
+- Current title
+- Current bullet points
+
+Right panel — "AI Optimized Version" (slightly highlighted)
+- Improved title (highlighted in green if changed)
+- 5 improved bullet points
+
+Below split view:
+"Marketing Angles" — 3 cards each with:
+- Angle name
+- Target audience
+- Hook line (bold, ready to use as ad headline)
+
+"Suggested Ad Headlines"
+3 headline options shown as copy-ready cards 
+with copy-to-clipboard button on each.
+
+--- SECTION 6: QUICK WINS ---
+Title: "Quick Wins (Do These This Week)"
+3 simple action items from AI.
+Shown as checklist-style cards.
+
+--- SECTION 7: SHARE ---
+"Share this report"
+Pre-written social post:
+"Just analyzed my Amazon market with Review Radar.
+Found {N} critical gaps competitors are exploiting.
+Market size: ${X}M/month.
+Get your free analysis → [URL]"
+
+Copy button for the post text.
+Share URL displayed clearly.
+
+### Page 3 — History (/history)
+Simple table of all past reports.
+Columns: Product | Date | Market Size | Status
+Search by product name.
+Click any row to open that report.
+
+---
+
+## IMPORTANT TECHNICAL NOTES
+
+1. ASYNC PROCESSING IS CRITICAL
+   The /api/analyze endpoint must respond in under 2 seconds.
+   All scraping and AI calls run in the background.
+   Frontend polls /api/status every 3 seconds until COMPLETE.
+
+2. UPDATE PROGRESS IN REAL TIME
+   As each step completes, update progress_message and 
+   percent_complete in the database immediately.
+   This makes the processing screen feel alive and trustworthy.
+
+3. GROQ RATE LIMITS
+   Add 500ms sleep between each Groq API call.
+   Never call Groq more than 2 times per second.
+
+4. REVIEW TRUNCATION
+   Never send more than 6000 characters to Groq in one call.
+   If reviews exceed this, take the most recent ones 
+   first until you hit the limit.
+
+5. FAILED SCRAPES
+   If a competitor listing fails to scrape after 2 attempts, 
+   skip it and continue. Never crash the whole report 
+   for one bad URL.
+
+6. JSON PARSING SAFETY
+   Always strip markdown fences (```json) before parsing 
+   Groq responses. Wrap every parse in try/catch. 
+   If parsing fails, store empty array as fallback 
+   and continue to next role.
+
+7. SHARE TOKEN
+   Generate the share token immediately when report 
+   is created (status=PENDING) so the URL works 
+   even during processing.
+
+8. RATE LIMITING
+   Max 3 analyses per IP per hour to protect API costs.
+
+9. NO MOCK DATA
+   Every number, insight, and recommendation must come 
+   from real scraped data or real Groq analysis. 
+   No placeholders. No hardcoded examples.
+
+10. SCRAPERAPI FALLBACK
+    Only use ScraperAPI when direct scraping is blocked. 
+    It is the fallback, not the primary method.
+
+---
+
+## ENVIRONMENT VARIABLES NEEDED
+
+GROQ_API_KEY=
+SCRAPERAPI_KEY=
+
+I will add these to Replit Secrets once you are ready.
+Do not hardcode any API keys in the code.
+
+---
+
+Build this completely.
+Start with the database and backend API, 
+then the scraping service, 
+then the Groq AI pipeline, 
+then the frontend.
+Tell me when you need the API keys.
